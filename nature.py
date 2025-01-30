@@ -5,116 +5,144 @@ from io import BytesIO
 import random
 
 # Configure page
-st.set_page_config(page_title="Nature Sound Generator", page_icon="🌿")
+st.set_page_config(page_title="Advanced Nature Generator", page_icon="🌍")
 
-# Sound profiles with synthesis parameters
+# Expanded sound profiles with layered ecosystems
 NATURE_SOUNDS = {
-    "Forest Rain": {
-        "components": [
-            ("rain", {"intensity": 0.7, "drop_variance": 0.3}),
-            ("thunder", {"frequency": 0.02, "intensity": 0.1}),
-            ("birds", {"density": 0.05, "pitch_variance": 0.4})
-        ],
-        "bg_color": "#2d5a27"
+    "Tropical Rainforest": {
+        "components": {
+            "rain": {"intensity": 0.6, "drop_size": 0.4},
+            "thunder": {"frequency": 0.03, "boom_duration": 1.5},
+            "jungle_birds": {"density": 0.1, "pitch_variance": 0.8},
+            "insects": {"type": "cicadas", "density": 0.7},
+            "waterfall": {"distance": 0.3, "spray_intensity": 0.2}
+        },
+        "bg_color": "#1e3b22"
     },
-    "Ocean Waves": {
-        "components": [
-            ("waves", {"interval": 4.0, "crash_intensity": 0.5}),
-            ("seagulls", {"density": 0.03}),
-            ("wind", {"intensity": 0.3})
-        ],
-        "bg_color": "#1a5f96"
+    "Arctic Winds": {
+        "components": {
+            "wind": {"speed": 0.9, "gust_frequency": 0.4},
+            "ice_cracks": {"frequency": 0.05, "intensity": 0.3},
+            "snowfall": {"intensity": 0.8, "crystal_size": 0.5},
+            "aurora": {"hum_frequency": 45, "modulation": 0.1}
+        },
+        "bg_color": "#a8d0e6"
     },
-    "Mountain Stream": {
-        "components": [
-            ("water_flow", {"speed": 0.8, "bubbles": 0.4}),
-            ("wind_chimes", {"density": 0.1}),
-            ("distant_birds", {"density": 0.02})
-        ],
-        "bg_color": "#3e7cb1"
+    "Desert Night": {
+        "components": {
+            "wind": {"speed": 0.4, "sand_grain": 0.7},
+            "coyote": {"frequency": 0.02, "pitch": 0.3},
+            "cricket": {"density": 0.9, "rhythm": 0.8},
+            "campfire": {"crackle_intensity": 0.6, "smoke": 0.4}
+        },
+        "bg_color": "#c2b280"
     },
-    "Sacred Garden": {
-        "components": [
-            ("singing_bowls", {"frequency": 528, "harmonics": 3}),
-            ("birds", {"density": 0.07}),
-            ("water_drops", {"interval": 0.5})
-        ],
-        "bg_color": "#4f772d"
+    "Mystical Cave": {
+        "components": {
+            "water_drips": {"reverb": 0.8, "interval": 0.7},
+            "crystal_hum": {"frequency": 174, "harmonics": 5},
+            "echoing_steps": {"frequency": 0.05, "distance": 0.4},
+            "subterranean_wind": {"pressure": 0.5, "tunnel_length": 0.6}
+        },
+        "bg_color": "#4a3b6a"
     }
 }
 
-def generate_nature_sound(duration_sec, profile):
+# Advanced sound synthesis functions
+def generate_wind(speed, duration, sample_rate=44100):
+    t = np.linspace(0, duration, int(sample_rate * duration))
+    base = 0.3 * np.random.randn(len(t))
+    
+    # Add gust patterns
+    gusts = np.zeros(len(t))
+    num_gusts = int(speed * duration * 10)
+    for _ in range(num_gusts):
+        start = random.randint(0, len(t)-1000)
+        gust = np.random.randn(1000) * np.linspace(0,1,1000)
+        gusts[start:start+1000] += gust * speed
+    
+    # Low-pass filter for wind effect
+    wind = np.convolve(base + gusts, np.ones(100)/100, mode='same')
+    return 0.5 * wind / np.max(np.abs(wind))
+
+def generate_waterfall(distance, duration, sample_rate=44100):
+    t = np.linspace(0, duration, sample_rate * duration)
+    main_flow = 0.4 * np.random.randn(len(t))
+    
+    # White noise with modulated amplitude
+    spray = np.random.randn(len(t)) * (1 - distance)
+    spray *= np.sin(2 * np.pi * 0.5 * t) ** 2
+    
+    # Low-frequency rumble
+    rumble = 0.1 * np.sin(2 * np.pi * 45 * t + 10 * np.sin(2 * np.pi * 0.2 * t))
+    
+    return 0.6 * (main_flow + spray + rumble)
+
+def generate_insects(density, duration, sample_rate=44100):
+    t = np.linspace(0, duration, sample_rate * duration)
+    insects = np.zeros(len(t))
+    
+    # Create swarming pattern
+    num_swarms = int(density * 20)
+    for _ in range(num_swarms):
+        freq = 3000 + 5000 * random.random()
+        swarm = np.sin(2 * np.pi * freq * t) 
+        swarm *= np.random.rand(len(t)) < density/10
+        insects += swarm
+    
+    return 0.2 * insects / np.max(np.abs(insects))
+
+# Main generation function
+def generate_environment(duration_sec, profile):
     sample_rate = 44100
-    t = np.linspace(0, duration_sec, int(sample_rate * duration_sec))
+    t = np.linspace(0, duration_sec, sample_rate * duration_sec)
     audio = np.zeros(len(t))
     
-    # Generate each component
-    for component, params in profile["components"]:
-        if component == "rain":
-            # Rain with varying droplet sounds
-            intensity = params["intensity"]
-            drop_rate = 20 + 50 * params["drop_variance"]
-            droplets = np.random.poisson(drop_rate, len(t))
-            rain = np.convolve(droplets, np.random.randn(100), mode='same')
-            audio += intensity * 0.1 * rain[:len(t)]
-            
-        elif component == "waves":
-            # Wave crashes with periodicity
-            wave_interval = int(sample_rate * params["interval"])
-            num_waves = int(duration_sec / params["interval"])
-            for i in range(num_waves):
-                start = i * wave_interval
-                end = start + wave_interval
-                wave = np.random.randn(min(wave_interval, len(t)-start)) 
-                wave *= np.hanning(len(wave)) * params["crash_intensity"]
-                audio[start:end] += wave[:len(audio[start:end])]
-                
-        elif component == "birds":
-            # Randomized bird calls
-            density = params["density"]
-            num_calls = int(density * duration_sec)
-            for _ in range(num_calls):
-                freq = 1000 + 2000 * random.random()
-                duration = 0.1 + 0.3 * random.random()
-                bird = np.sin(2 * np.pi * freq * t) * np.exp(-5*t/duration)
-                audio += bird * 0.2
-                
-        elif component == "singing_bowls":
-            # Harmonic singing bowl effect
-            base_freq = params["frequency"]
-            harmonics = [np.sin(2 * np.pi * (base_freq*(n+1)) * t) 
-                        for n in range(params["harmonics"])]
-            bowl = sum(harmonics) * np.exp(-t/5)
-            audio += 0.3 * bowl
-            
+    # Component routing
+    if "wind" in profile["components"]:
+        params = profile["components"]["wind"]
+        audio += 0.5 * generate_wind(params["speed"], duration_sec)
+    
+    if "waterfall" in profile["components"]:
+        params = profile["components"]["waterfall"]
+        audio += 0.7 * generate_waterfall(params["distance"], duration_sec)
+    
+    if "insects" in profile["components"]:
+        params = profile["components"]["insects"]
+        audio += generate_insects(params["density"], duration_sec)
+    
     # Normalize and convert
     audio = audio / np.max(np.abs(audio))
     audio = (audio * 32767).astype(np.int16)
     return audio
 
 # Streamlit UI
-st.title("🌳 Nature Soundscape Generator")
-st.markdown("Create custom environmental audio for relaxation, focus, or meditation")
+st.title("🌍 Advanced Nature Sound Generator")
+st.markdown("Procedurally generated ecosystems with dynamic sound physics")
 
-# Sound selection
-selected_sound = st.selectbox(
-    "Choose Your Environment",
+# Environment selection
+selected_env = st.selectbox(
+    "Choose Ecosystem",
     options=list(NATURE_SOUNDS.keys()),
-    format_func=lambda x: f"{x} {'🌧️' if 'Rain' in x else '🌊' if 'Ocean' in x else '🌲'}"
+    format_func=lambda x: f"{x} {'❄️' if 'Arctic' in x else '🏜️' if 'Desert' in x else '🌴'}"
 )
 
-# Customization
-col1, col2 = st.columns(2)
-with col1:
-    duration = st.slider("Duration (minutes)", 1, 120, 30)
-with col2:
-    intensity = st.slider("Sound Intensity", 0.5, 2.0, 1.0)
+# Parameter controls
+with st.expander("Advanced Sound Parameters"):
+    col1, col2 = st.columns(2)
+    with col1:
+        wind_control = st.slider("Wind Intensity", 0.0, 1.0, 0.5)
+        water_control = st.slider("Water Presence", 0.0, 1.0, 0.7)
+    with col2:
+        animal_density = st.slider("Animal Activity", 0.0, 1.0, 0.3)
+        mystical_elements = st.slider("Mystical Effects", 0.0, 1.0, 0.0)
 
 # Generate audio
-if st.button("Create Soundscape"):
-    profile = NATURE_SOUNDS[selected_sound]
-    with st.spinner(f"Generating {selected_sound}..."):
-        audio = generate_nature_sound(duration * 60, profile)
+duration = st.slider("Duration (minutes)", 1, 180, 30)
+if st.button("Generate Ecosystem"):
+    profile = NATURE_SOUNDS[selected_env]
+    with st.spinner(f"Rendering {selected_env} Soundscape..."):
+        audio = generate_environment(duration * 60, profile)
         buffer = BytesIO()
         write(buffer, 44100, audio)
         
@@ -122,7 +150,7 @@ if st.button("Create Soundscape"):
         st.download_button(
             label="Download Soundscape",
             data=buffer.getvalue(),
-            file_name=f"{selected_sound.replace(' ', '_')}.wav",
+            file_name=f"{selected_env.replace(' ', '_')}.wav",
             mime="audio/wav"
         )
 
@@ -130,7 +158,10 @@ if st.button("Create Soundscape"):
 st.markdown(f"""
 <style>
 .stSelectbox:first-child > div {{
-    border: 2px solid {NATURE_SOUNDS[selected_sound]['bg_color']} !important;
+    border: 2px solid {NATURE_SOUNDS[selected_env]['bg_color']} !important;
+}}
+[data-testid="stExpander"] {{
+    background: {NATURE_SOUNDS[selected_env]['bg_color']}20;
 }}
 </style>
 """, unsafe_allow_html=True)
