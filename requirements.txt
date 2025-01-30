@@ -1,2 +1,3 @@
-pip install streamlit numpy scipy
-streamlit run nature_sounds.py
+streamlit==1.32.2
+numpy==1.26.4
+scipy==1.11.4
