@@ -1,0 +1,136 @@
+import streamlit as st
+import numpy as np
+from scipy.io.wavfile import write
+from io import BytesIO
+import random
+
+# Configure page
+st.set_page_config(page_title="Nature Sound Generator", page_icon="🌿")
+
+# Sound profiles with synthesis parameters
+NATURE_SOUNDS = {
+    "Forest Rain": {
+        "components": [
+            ("rain", {"intensity": 0.7, "drop_variance": 0.3}),
+            ("thunder", {"frequency": 0.02, "intensity": 0.1}),
+            ("birds", {"density": 0.05, "pitch_variance": 0.4})
+        ],
+        "bg_color": "#2d5a27"
+    },
+    "Ocean Waves": {
+        "components": [
+            ("waves", {"interval": 4.0, "crash_intensity": 0.5}),
+            ("seagulls", {"density": 0.03}),
+            ("wind", {"intensity": 0.3})
+        ],
+        "bg_color": "#1a5f96"
+    },
+    "Mountain Stream": {
+        "components": [
+            ("water_flow", {"speed": 0.8, "bubbles": 0.4}),
+            ("wind_chimes", {"density": 0.1}),
+            ("distant_birds", {"density": 0.02})
+        ],
+        "bg_color": "#3e7cb1"
+    },
+    "Sacred Garden": {
+        "components": [
+            ("singing_bowls", {"frequency": 528, "harmonics": 3}),
+            ("birds", {"density": 0.07}),
+            ("water_drops", {"interval": 0.5})
+        ],
+        "bg_color": "#4f772d"
+    }
+}
+
+def generate_nature_sound(duration_sec, profile):
+    sample_rate = 44100
+    t = np.linspace(0, duration_sec, int(sample_rate * duration_sec))
+    audio = np.zeros(len(t))
+    
+    # Generate each component
+    for component, params in profile["components"]:
+        if component == "rain":
+            # Rain with varying droplet sounds
+            intensity = params["intensity"]
+            drop_rate = 20 + 50 * params["drop_variance"]
+            droplets = np.random.poisson(drop_rate, len(t))
+            rain = np.convolve(droplets, np.random.randn(100), mode='same')
+            audio += intensity * 0.1 * rain[:len(t)]
+            
+        elif component == "waves":
+            # Wave crashes with periodicity
+            wave_interval = int(sample_rate * params["interval"])
+            num_waves = int(duration_sec / params["interval"])
+            for i in range(num_waves):
+                start = i * wave_interval
+                end = start + wave_interval
+                wave = np.random.randn(min(wave_interval, len(t)-start)) 
+                wave *= np.hanning(len(wave)) * params["crash_intensity"]
+                audio[start:end] += wave[:len(audio[start:end])]
+                
+        elif component == "birds":
+            # Randomized bird calls
+            density = params["density"]
+            num_calls = int(density * duration_sec)
+            for _ in range(num_calls):
+                freq = 1000 + 2000 * random.random()
+                duration = 0.1 + 0.3 * random.random()
+                bird = np.sin(2 * np.pi * freq * t) * np.exp(-5*t/duration)
+                audio += bird * 0.2
+                
+        elif component == "singing_bowls":
+            # Harmonic singing bowl effect
+            base_freq = params["frequency"]
+            harmonics = [np.sin(2 * np.pi * (base_freq*(n+1)) * t) 
+                        for n in range(params["harmonics"])]
+            bowl = sum(harmonics) * np.exp(-t/5)
+            audio += 0.3 * bowl
+            
+    # Normalize and convert
+    audio = audio / np.max(np.abs(audio))
+    audio = (audio * 32767).astype(np.int16)
+    return audio
+
+# Streamlit UI
+st.title("🌳 Nature Soundscape Generator")
+st.markdown("Create custom environmental audio for relaxation, focus, or meditation")
+
+# Sound selection
+selected_sound = st.selectbox(
+    "Choose Your Environment",
+    options=list(NATURE_SOUNDS.keys()),
+    format_func=lambda x: f"{x} {'🌧️' if 'Rain' in x else '🌊' if 'Ocean' in x else '🌲'}"
+)
+
+# Customization
+col1, col2 = st.columns(2)
+with col1:
+    duration = st.slider("Duration (minutes)", 1, 120, 30)
+with col2:
+    intensity = st.slider("Sound Intensity", 0.5, 2.0, 1.0)
+
+# Generate audio
+if st.button("Create Soundscape"):
+    profile = NATURE_SOUNDS[selected_sound]
+    with st.spinner(f"Generating {selected_sound}..."):
+        audio = generate_nature_sound(duration * 60, profile)
+        buffer = BytesIO()
+        write(buffer, 44100, audio)
+        
+        st.audio(buffer.getvalue(), format='audio/wav')
+        st.download_button(
+            label="Download Soundscape",
+            data=buffer.getvalue(),
+            file_name=f"{selected_sound.replace(' ', '_')}.wav",
+            mime="audio/wav"
+        )
+
+# Style customization
+st.markdown(f"""
+<style>
+.stSelectbox:first-child > div {{
+    border: 2px solid {NATURE_SOUNDS[selected_sound]['bg_color']} !important;
+}}
+</style>
+""", unsafe_allow_html=True)
