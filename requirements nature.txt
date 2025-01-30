@@ -1,0 +1,2 @@
+pip install streamlit numpy scipy
+streamlit run nature_sounds.py
